@@ -1,0 +1,5 @@
+{
+  "name": "LearnMate AI",
+  "description": "An AI-powered learning assistant that supports PDF, text, and image uploads to provide comprehensive help to students across various modules.",
+  "requestFramePermissions": []
+}
