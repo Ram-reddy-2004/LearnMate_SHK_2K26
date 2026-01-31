@@ -1,14 +1,10 @@
 
 # 🚀 LearnMate AI – An AI-Powered Education Assistant  
 
-# Run and deploy your AI Studio app
-LearnMate AI is my project built for the **NextWave Buildathon (by OpenAI)**.  
+LearnMate AI is my project built for the **Siddharth Hack Fest**.  
 It’s designed to make learning **smarter, personalized, and interactive** by combining AI + Education.  
 
-This contains everything you need to run your app locally.
----
 
-View your app in AI Studio: https://ai.studio/apps/drive/1zDZICAhdbFQiwPgbM6-KLSqs4X6iZzzx
 ## 🌟 Features Overview  
 
 ## Run Locally
@@ -45,7 +41,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1zDZICAhdbFQiwPgbM6-KLS
 ## SignUp Page
 <img width="1920" height="980" alt="image" src="https://github.com/user-attachments/assets/d18705b2-6ff7-461b-8fc0-18d2c530c72b" />
 ## Signin Page
-<img width="1909" height="981" alt="image" src="https://github.com/user-attachments/assets/cef9c2c5-3f57-4058-99ec-f3a3c87d9390" />
+<img width="1543" height="794" alt="image" src="https://github.com/user-attachments/assets/39cc2faa-f98b-4f13-864f-077212844141" />
+
 
 
 
