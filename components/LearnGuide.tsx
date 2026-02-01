@@ -1,12 +1,15 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { generateLearnGuideContent, explainCodeSnippet, getConceptExplanation, reexplainConcept, generateMoreInterviewQuestions, type LearnGuideContent as GuideContentData } from '../services/geminiService';
-import { type Concept, type LearnGoal } from '../types';
-import { BrainCircuitIcon, CheckIcon, HelpCircleIcon, ArrowRightIcon, Volume2Icon, PauseIcon, SparklesIcon, ClipboardIcon, BookOpenIcon, PencilLineIcon, CodeIcon, PulseIcon } from './Icons';
+import { generateLearnGuideContent, explainCodeSnippet, getConceptExplanation, reexplainConcept, generateMoreInterviewQuestions } from '../services/geminiService';
+// Fix: Import LearnGuideContent from types instead of geminiService
+import { type Concept, type LearnGoal, type LearnGuideContent as GuideContentData } from '../types';
+import { BrainCircuitIcon, CheckIcon, HelpCircleIcon, ArrowRightIcon, Volume2Icon, PauseIcon, SparklesIcon, ClipboardIcon, BookOpenIcon, PencilLineIcon, CodeIcon, PulseIcon, LinkIcon } from './Icons';
 import { ModuleLoadingIndicator } from './LoadingIndicators';
 
 interface LearnGuideProps {
     knowledgeBase: string;
     onNavigateToVault: () => void;
+    sources?: { title: string; uri: string }[];
 }
 
 type LearnGuideView = 'goal_selection' | 'generating' | 'active' | 'error';
@@ -228,7 +231,7 @@ const parseTextToBlocks = (text: string, baseId: string): RenderableBlock[] => {
 
 // --- MAIN COMPONENT ---
 
-const LearnGuide: React.FC<LearnGuideProps> = ({ knowledgeBase, onNavigateToVault }) => {
+const LearnGuide: React.FC<LearnGuideProps> = ({ knowledgeBase, onNavigateToVault, sources }) => {
     const [view, setView] = useState<LearnGuideView>('goal_selection');
     const [guideContent, setGuideContent] = useState<GuideContentData | null>(null);
     const [errorMessage, setErrorMessage] = useState<string>('');
@@ -522,6 +525,24 @@ const LearnGuide: React.FC<LearnGuideProps> = ({ knowledgeBase, onNavigateToVaul
         );
     };
 
+    const renderSources = () => {
+        if (!sources || sources.length === 0) return null;
+        return (
+            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                    <LinkIcon className="h-5 w-5 text-blue-500" /> Grounding Sources
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                    {sources.map((source, i) => (
+                        <a key={i} href={source.uri} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium hover:underline flex items-center gap-2">
+                             {source.title}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
     const renderStructuredContent = () => {
         const progress = conceptTitles.length > 0 ? (understoodIndices.size / conceptTitles.length) * 100 : 0;
         return (
@@ -561,6 +582,7 @@ const LearnGuide: React.FC<LearnGuideProps> = ({ knowledgeBase, onNavigateToVaul
                     </aside>
                     <main className="w-2/3 h-full overflow-y-auto pr-2">
                         {renderActiveContent()}
+                        {renderSources()}
                     </main>
                 </div>
             </div>
@@ -696,6 +718,7 @@ const LearnGuide: React.FC<LearnGuideProps> = ({ knowledgeBase, onNavigateToVaul
                             <button onClick={() => setView('goal_selection')} className="text-sm font-medium text-blue-500 hover:underline">← Change Goal</button>
                         </div>
                         {renderActiveContent()}
+                        {renderSources()}
                     </div>
                 )
             )}
