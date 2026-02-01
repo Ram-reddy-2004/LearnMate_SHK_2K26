@@ -1,8 +1,8 @@
 
-
 import React, { useState, useCallback, useRef } from 'react';
 import { processLearnVaultContent, generateKnowledgeBase } from '../services/geminiService';
-import { UploadCloudIcon, FileIcon, ImageIcon, FileTextIcon, XIcon, BrainCircuitIcon, LinkIcon, PaperclipIcon, SparklesIcon } from './Icons';
+import { getYoutubeVideoId } from '../services/youtubeService';
+import { UploadCloudIcon, FileIcon, ImageIcon, FileTextIcon, XIcon, BrainCircuitIcon, LinkIcon, PaperclipIcon, SparklesIcon, YoutubeIcon } from './Icons';
 
 const getFileIcon = (fileType: string) => {
     if (fileType.startsWith('image/')) return <ImageIcon className="h-6 w-6 text-purple-500" />;
@@ -180,7 +180,7 @@ const LearnVaultComponent: React.FC<LearnVaultProps> = ({ onVaultCreated }) => {
                         type="url"
                         value={currentLink}
                         onChange={(e) => setCurrentLink(e.target.value)}
-                        placeholder="https://youtube.com/watch?v=... or any article URL"
+                        placeholder="Paste YouTube link or Article URL"
                         className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
@@ -192,17 +192,30 @@ const LearnVaultComponent: React.FC<LearnVaultProps> = ({ onVaultCreated }) => {
                 <div className="mt-4 w-full text-left">
                     <h3 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Added Links:</h3>
                     <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                        {links.map((link, index) => (
-                            <div key={index} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded-lg p-2 animate-fade-in">
-                                <div className="flex items-center gap-3">
-                                    <LinkIcon className="h-5 w-5 text-gray-500"/>
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate max-w-md">{link}</span>
+                        {links.map((link, index) => {
+                            const isYoutube = getYoutubeVideoId(link);
+                            return (
+                                <div key={index} className="flex flex-col bg-gray-100 dark:bg-gray-700 rounded-lg p-3 animate-fade-in border-l-4 border-l-transparent group hover:border-l-blue-500 transition-all shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            {isYoutube ? <YoutubeIcon className="h-5 w-5 text-red-500 flex-shrink-0"/> : <LinkIcon className="h-5 w-5 text-gray-500 flex-shrink-0"/>}
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{link}</span>
+                                        </div>
+                                        <button onClick={() => removeLink(link)} className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full flex-shrink-0 ml-2">
+                                            <XIcon className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    {isYoutube && (
+                                        <div className="flex items-center gap-1.5 mt-2 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-100 dark:border-red-900/30">
+                                            <SparklesIcon className="h-3 w-3 text-red-500 animate-pulse" />
+                                            <p className="text-[10px] text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">
+                                                YouTube Transcript will be read automatically
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
-                                <button onClick={() => removeLink(link)} className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full">
-                                    <XIcon className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -240,16 +253,16 @@ const LearnVaultComponent: React.FC<LearnVaultProps> = ({ onVaultCreated }) => {
                 </p>
 
                 <div className="w-full">
-                    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
-                        <button onClick={() => setActiveTab('files')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors ${activeTab === 'files' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
+                    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto no-scrollbar">
+                        <button onClick={() => setActiveTab('files')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors flex-shrink-0 ${activeTab === 'files' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
                             <PaperclipIcon className="h-5 w-5" />
                             Upload Files
                         </button>
-                        <button onClick={() => setActiveTab('links')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors ${activeTab === 'links' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
+                        <button onClick={() => setActiveTab('links')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors flex-shrink-0 ${activeTab === 'links' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
                             <LinkIcon className="h-5 w-5" />
                             Add Links
                         </button>
-                         <button onClick={() => setActiveTab('generate')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors ${activeTab === 'generate' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
+                         <button onClick={() => setActiveTab('generate')} className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors flex-shrink-0 ${activeTab === 'generate' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}>
                             <SparklesIcon className="h-5 w-5" />
                             Generate Knowledge
                         </button>
@@ -272,7 +285,7 @@ const LearnVaultComponent: React.FC<LearnVaultProps> = ({ onVaultCreated }) => {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Processing...
+                                Reading content...
                             </>
                         ) : (
                             'Create & Add to Vault'
