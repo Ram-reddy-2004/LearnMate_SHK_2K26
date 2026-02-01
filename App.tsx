@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { auth, db } from './services/firebaseConfig';
 import { useAuth } from './context/AuthContext';
@@ -235,7 +236,7 @@ const App: React.FC = () => {
     }
   }, [user]);
   
-  const handleVaultCreated = useCallback(async (vaultData: { title: string; content: string; summary: string; }) => {
+  const handleVaultCreated = useCallback(async (vaultData: { title: string; content: string; summary: string; sources?: {title: string, uri: string}[] }) => {
     if (!user) return;
     try {
         const newVaultId = await addLearnVault(user.uid, vaultData);
@@ -297,6 +298,7 @@ const App: React.FC = () => {
   }
   
   const knowledgeBase = activeVault?.content || '';
+  const sources = activeVault?.sources || [];
   
   const renderModuleContent = () => {
     switch (activeModule) {
@@ -306,6 +308,7 @@ const App: React.FC = () => {
         return <LearnGuide 
                   knowledgeBase={knowledgeBase} 
                   onNavigateToVault={handleNewChat}
+                  sources={sources}
                />;
       case 'SmartQuiz':
         return <SmartQuiz 
