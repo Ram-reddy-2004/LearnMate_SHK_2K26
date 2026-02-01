@@ -1,9 +1,13 @@
+
+
 const { onRequest } = require("firebase-functions/v2/https");
 const { YoutubeTranscript } = require("youtube-transcript");
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin SDK to interact with Firestore
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 
 /**
@@ -12,24 +16,30 @@ const db = admin.firestore();
  */
 exports.getTranscript = onRequest(
   {
-    cpu: 1, // Allocate CPU to allow outbound networking
-    cors: true, // Enable built-in CORS support
+    cpu: 1, 
+    memory: "256MiB",
+    cors: true, // v2 automatically handles OPTIONS preflight and sets Access-Control-Allow-Origin: *
+    invoker: "public", // Ensure it's reachable without Auth
   },
   async (request, response) => {
-    // Check for POST request
+    // Handle OPTIONS specifically if needed, though cors: true does this
+    if (request.method === "OPTIONS") {
+      response.status(204).send("");
+      return;
+    }
+
     if (request.method !== "POST") {
       response.status(405).json({
-        error: "Method Not Allowed",
+        error: "Method Not Allowed. Please use POST.",
       });
       return;
     }
 
-    // The v2 SDK and modern fetch APIs correctly parse JSON, no 'data' wrapper needed in the body itself.
     const { videoId } = request.body;
 
-    if (!videoId) {
+    if (!videoId || videoId.length !== 11) {
       response.status(400).json({
-        error: "Missing 'videoId' in the request body.",
+        error: "Invalid or missing 'videoId'. Must be exactly 11 characters.",
       });
       return;
     }
@@ -37,11 +47,11 @@ exports.getTranscript = onRequest(
     const transcriptDocRef = db.collection("transcripts").doc(videoId);
 
     try {
-      // --- Caching Logic: Step 1 - Check Firestore First ---
+      // 1. Check Cache
       const docSnapshot = await transcriptDocRef.get();
       if (docSnapshot.exists) {
-        console.log(`Cache HIT for videoId: ${videoId}`);
         const cachedData = docSnapshot.data();
+        console.log(`[CACHE HIT] videoId: ${videoId}`);
         response.status(200).json({
           transcript: cachedData.transcript,
           source: "cache",
@@ -49,48 +59,44 @@ exports.getTranscript = onRequest(
         return;
       }
 
-      // --- Cache Miss: Fetch from YouTube ---
-      console.log(`Cache MISS for videoId: ${videoId}. Fetching from YouTube.`);
-      const transcriptParts = await YoutubeTranscript.fetchTranscript(videoId);
+      // 2. Fetch from YouTube
+      console.log(`[FETCHING] videoId: ${videoId} from YouTube.`);
+      
+      // The library might throw if transcripts are disabled
+      const transcriptParts = await YoutubeTranscript.fetchTranscript(videoId).catch(err => {
+        console.warn(`[LIBRARY ERROR] for ${videoId}:`, err.message);
+        return null;
+      });
 
       if (!transcriptParts || transcriptParts.length === 0) {
         response.status(404).json({
-          error: "Transcript not found or is empty for this video.",
+          error: "Transcript not available for this video (it might be disabled or auto-generated only).",
         });
         return;
       }
 
-      // Combine the transcript parts into a single string
-      const fullTranscript = transcriptParts.map((part) => part.text).join(" ");
+      const fullTranscript = transcriptParts
+        .map((part) => part.text)
+        .join(" ")
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      // --- Caching Logic: Step 2 - Save to Firestore ---
-      const cacheData = {
+      // 3. Update Cache
+      await transcriptDocRef.set({
         transcript: fullTranscript,
         cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-      await transcriptDocRef.set(cacheData);
-      console.log(`Successfully fetched and cached transcript for ${videoId}.`);
+      });
 
       response.status(200).json({
         transcript: fullTranscript,
-        source: "youtube-api",
+        source: "youtube",
       });
 
     } catch (error) {
-      console.error(`Error processing transcript for ${videoId}:`, error);
-      let errorMessage = "An unexpected error occurred.";
-      if (error.message) {
-        if (error.message.includes("Transcripts are disabled")) {
-          errorMessage = "Transcripts are disabled for this video.";
-        } else if (error.message.includes("No transcript found")) {
-          errorMessage = "No transcript is available for this video.";
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      // Do not cache errors.
+      console.error(`[SYSTEM ERROR] for ${videoId}:`, error);
       response.status(500).json({
-        error: errorMessage,
+        error: "Internal server error while fetching transcript.",
+        details: error.message
       });
     }
   }
