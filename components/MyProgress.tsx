@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { type UserData, type QuizResult, type TestResult, type LearnVault } from '../types';
 import { LightbulbIcon, TrendingUpIcon, CodeIcon, TargetIcon, PencilRulerIcon as QuizzesTakenIcon, FlaskConicalIcon, PencilRulerIcon, BrainCircuitIcon } from './Icons';
-import { db } from '../services/firebaseConfig';
+import { getQuizHistory, getCodingHistory } from '../services/firebaseService';
 import { generateOverallSummary } from '../services/geminiService';
 import { ModuleLoadingIndicator, InlineLoadingIndicator } from './LoadingIndicators';
 
@@ -56,7 +57,6 @@ const QuizPerformanceChart: React.FC<{ data: QuizResult[] }> = ({ data }) => {
 
     return (
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full" aria-label="Quiz Performance Chart">
-            {/* Y Axis Grid Lines & Labels */}
             {yAxisLabels.map(label => {
                 const y = height - padding - ((label / 100) * (height - padding * 2));
                 return (
@@ -68,8 +68,6 @@ const QuizPerformanceChart: React.FC<{ data: QuizResult[] }> = ({ data }) => {
                     </g>
                 );
             })}
-
-            {/* X Axis Labels */}
             {xAxisLabels.slice(0, 1).concat(xAxisLabels.slice(-1)).map((label, i) => {
                  const index = i === 0 ? 0 : xAxisLabels.length - 1;
                  const x = (index / (xAxisLabels.length - 1)) * (width - padding * 2) + padding;
@@ -79,16 +77,13 @@ const QuizPerformanceChart: React.FC<{ data: QuizResult[] }> = ({ data }) => {
                     </text>
                 );
             })}
-            
             <path d={pathD} fill="none" strokeWidth="3" className="stroke-blue-500" />
-            
             {points.map((p, i) => (
                 <circle key={i} cx={p.x} cy={p.y} r="4" className="fill-blue-500" />
             ))}
         </svg>
     );
 };
-
 
 const MyProgress: React.FC<MyProgressProps> = ({ userData, vaults, onNavigateToQuiz, onNavigateToTestBuddy }) => {
     const { user } = useAuth();
@@ -106,23 +101,23 @@ const MyProgress: React.FC<MyProgressProps> = ({ userData, vaults, onNavigateToQ
             return;
         }
 
-        setIsLoadingHistory(true);
-        const quizUnsubscribe = db.collection('users').doc(user.uid).collection('quizResults')
-            .orderBy('attemptedAt', 'asc')
-            .onSnapshot(snapshot => {
-                const quizzes = snapshot.docs.map(doc => ({ ...doc.data(), quizId: doc.id, attemptedAt: doc.data().attemptedAt?.toDate().toISOString() || new Date().toISOString() } as QuizResult));
+        const fetchHistory = async () => {
+            setIsLoadingHistory(true);
+            try {
+                const [quizzes, coding] = await Promise.all([
+                    getQuizHistory(user.uid),
+                    getCodingHistory(user.uid)
+                ]);
                 setQuizHistory(quizzes);
+                setCodingHistory(coding);
+            } catch (err) {
+                console.error("History fetch error:", err);
+            } finally {
                 setIsLoadingHistory(false);
-            }, err => { console.error("Error fetching quiz history:", err); setIsLoadingHistory(false); });
+            }
+        };
 
-        const codingUnsubscribe = db.collection('users').doc(user.uid).collection('codingResults')
-            .orderBy('attemptedAt', 'asc')
-            .onSnapshot(snapshot => {
-                const tests = snapshot.docs.map(doc => ({ ...doc.data(), testId: doc.id, attemptedAt: doc.data().attemptedAt?.toDate().toISOString() || new Date().toISOString() } as TestResult));
-                setCodingHistory(tests);
-            }, err => console.error("Error fetching coding history:", err));
-
-        return () => { quizUnsubscribe(); codingUnsubscribe(); };
+        fetchHistory();
     }, [user]);
 
     useEffect(() => {
@@ -132,26 +127,21 @@ const MyProgress: React.FC<MyProgressProps> = ({ userData, vaults, onNavigateToQ
         const generateAllInsights = async () => {
             try {
                 const summaries = vaults.map(v => v.summary);
+                if (summaries.length === 0) {
+                    setOverallSummary("Start creating vaults!");
+                    return;
+                }
                 const summaryText = await generateOverallSummary(summaries);
-
-                if (isMounted) {
-                    setOverallSummary(summaryText);
-                }
+                if (isMounted) setOverallSummary(summaryText);
             } catch (error) {
-                console.error("Failed to generate summary:", error);
-                if (isMounted) {
-                    setOverallSummary("Could not generate a learning journey summary.");
-                }
+                if (isMounted) setOverallSummary("Could not generate a learning journey summary.");
             } finally {
-                if (isMounted) {
-                    setIsSummaryLoading(false);
-                }
+                if (isMounted) setIsSummaryLoading(false);
             }
         };
 
         generateAllInsights();
         return () => { isMounted = false; };
-
     }, [vaults]);
 
     const performanceStats = useMemo(() => {
@@ -160,7 +150,6 @@ const MyProgress: React.FC<MyProgressProps> = ({ userData, vaults, onNavigateToQ
         const quizAccuracy = quizzesTaken > 0 ? Math.round(totalQuizScore / quizzesTaken) : 0;
         const passedTests = codingHistory.filter(test => test.status === 'Passed');
         const problemsSolved = new Set(passedTests.map(test => test.testId)).size;
-
         return { quizzesTaken, quizAccuracy, problemsSolved };
     }, [quizHistory, codingHistory]);
 
@@ -194,21 +183,18 @@ const MyProgress: React.FC<MyProgressProps> = ({ userData, vaults, onNavigateToQ
                 <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Welcome Back, {getFirstName()}! 😊</h1>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">Here's a snapshot of your progress. Keep up the great work!</p>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard icon={<BrainCircuitIcon className="h-6 w-6 text-purple-700 dark:text-purple-300"/>} title="Vaults Created" value={vaults.length} iconBgColor="bg-purple-100 dark:bg-purple-900/50"/>
                 <StatCard icon={<CodeIcon className="h-6 w-6 text-blue-700 dark:text-blue-300"/>} title="Problems Solved" value={performanceStats.problemsSolved} iconBgColor="bg-blue-100 dark:bg-blue-900/50"/>
                 <StatCard icon={<QuizzesTakenIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-300"/>} title="Quizzes Taken" value={performanceStats.quizzesTaken} iconBgColor="bg-yellow-100 dark:bg-yellow-900/50"/>
                 <StatCard icon={<TrendingUpIcon className="h-6 w-6 text-green-700 dark:text-green-300"/>} title="Quiz Accuracy" value={`${performanceStats.quizAccuracy}%`} iconBgColor="bg-green-100 dark:bg-green-900/50"/>
             </div>
-            
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Learning Journey Summary</h2>
                 <div className="bg-gray-50 dark:bg-gray-900/30 p-4 rounded-lg flex items-center justify-center min-h-[100px]">
                     {isSummaryLoading ? <InlineLoadingIndicator /> : <p className="text-gray-700 dark:text-gray-300 italic">"{overallSummary}"</p>}
                 </div>
             </div>
-
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Quiz Performance Over Time</h2>
                 <div className="h-64">{isLoadingHistory ? <ModuleLoadingIndicator text="" /> : <QuizPerformanceChart data={quizHistory} />}</div>
